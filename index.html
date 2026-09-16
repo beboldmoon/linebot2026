@@ -127,6 +127,18 @@
   .ebox button{font-family:inherit; font-weight:900; cursor:pointer; border:0;
     border-radius:12px; padding:11px 16px; font-size:16px;}
   .epick button{background:#eef4f9; color:#456; display:block; width:100%; margin-bottom:8px;}
+  .ebox{max-height:94vh; overflow-y:auto;}
+  .exTabs{display:flex; gap:6px; margin-bottom:8px;}
+  .ebox .exTabs button{flex:1; padding:7px 8px; font-size:14px; background:#eef4f9; color:#567;}
+  .ebox .exTabs button.on{background:#2f6db5; color:#fff;}
+  .exGrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); gap:6px;
+    max-height:172px; overflow-y:auto; padding:2px;}
+  .ebox .exGrid button{min-width:0; overflow:hidden; padding:4px 2px 3px; background:#f6fafd; border:2px solid #e2eaf1;
+    border-radius:10px; display:flex; flex-direction:column; align-items:center; gap:1px;}
+  .exGrid button:hover{border-color:#9dc0e6;}
+  .exGrid img{width:44px; height:44px; object-fit:contain; pointer-events:none;}
+  .exGrid span{font-size:10.5px; font-weight:800; color:#667; white-space:nowrap;
+    overflow:hidden; text-overflow:ellipsis; max-width:100%;}
   .erow{display:flex; gap:10px; margin-top:22px;}
   .erow button{flex:1; padding:13px; font-size:18px;}
   #edCancel{background:#eef2f5; color:#556;}
@@ -192,6 +204,12 @@
       </div>
     </div>
     <input id="edFile" type="file" accept="image/*" hidden>
+    <label>예시 그림에서 고르기</label>
+    <div class="exTabs" id="exTabs">
+      <button type="button" data-set="places" class="on">동네 장소</button>
+      <button type="button" data-set="landmarks">세계 랜드마크</button>
+    </div>
+    <div class="exGrid" id="exGrid"></div>
     <div class="erow">
       <button id="edCancel" type="button">취소</button>
       <button id="edSave" type="button">저장</button>
@@ -889,7 +907,7 @@ function openEditor(i){
   if(running) return;
   edIdx=i;
   const d=customSlot(lvl,i);
-  edName.value=d.name||''; edImg=d.img||'';
+  edName.value=d.name||''; edImg=d.img||''; edAutoName='';
   renderPreview();
   editor.hidden=false;
   setTimeout(()=>edName.focus(),60);
@@ -898,25 +916,68 @@ function closeEditor(){ editor.hidden=true; edFile.value=''; }
 
 document.getElementById('edPick').addEventListener('click',()=>edFile.click());
 document.getElementById('edDrop').addEventListener('click',()=>{ edImg=''; renderPreview(); });
+/* 그림을 긴 변 220px PNG data URL로 줄여 편집 중인 그림으로 설정 */
+function useImage(src, onDone){
+  const im=new Image();
+  im.onload=()=>{
+    let w=im.naturalWidth, h=im.naturalHeight;
+    if(!w||!h){ say('이 그림은 넣을 수 없어요','ask',true); return; }
+    const r=Math.min(1, 220/Math.max(w,h));
+    w=Math.max(1,Math.round(w*r)); h=Math.max(1,Math.round(h*r));
+    const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+    cv.getContext('2d').drawImage(im,0,0,w,h);
+    try{ edImg=cv.toDataURL('image/png'); }
+    catch(e){ say('인터넷 주소로 열어야 쓸 수 있어요','ask',true); return; }
+    renderPreview();
+    if(onDone) onDone();
+  };
+  im.onerror=()=>say('그림을 읽을 수 없어요','ask',true);
+  im.src=src;
+}
+
+/* 예시 그림 (examples 폴더) */
+const EXAMPLES={
+  places:[['01_학교','학교'],['02_도서관','도서관'],['03_병원','병원'],['04_소방서','소방서'],
+    ['05_경찰서','경찰서'],['06_공원','공원'],['07_마트','마트'],['08_우체국','우체국'],
+    ['09_빵집','빵집'],['10_놀이터','놀이터'],['11_우리집','우리 집'],['12_수영장','수영장']],
+  landmarks:[['01_에펠탑_프랑스','에펠탑'],['02_자유의여신상_미국','자유의 여신상'],
+    ['03_피라미드_이집트','피라미드'],['04_만리장성_중국','만리장성'],['05_타지마할_인도','타지마할'],
+    ['06_콜로세움_이탈리아','콜로세움'],['07_피사의사탑_이탈리아','피사의 사탑'],['08_빅벤_영국','빅벤'],
+    ['09_오페라하우스_호주','오페라하우스'],['10_후지산_일본','후지산'],['11_숭례문_한국','숭례문'],
+    ['12_모아이_칠레','모아이'],['13_성바실리대성당_러시아','성 바실리 성당'],['14_예수상_브라질','예수상'],
+    ['15_마추픽추_페루','마추픽추'],['16_파르테논신전_그리스','파르테논 신전'],
+    ['17_브란덴부르크문_독일','브란덴부르크문'],['18_부르즈할리파_UAE','부르즈 할리파'],
+    ['19_앙코르와트_캄보디아','앙코르와트'],['20_금문교_미국','금문교']]
+};
+const exGrid=document.getElementById('exGrid');
+const exTabs=document.getElementById('exTabs');
+let edAutoName='';   // 예시 그림이 자동으로 채운 이름 (직접 고친 이름은 덮어쓰지 않음)
+
+function renderExamples(set){
+  exTabs.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.set===set));
+  exGrid.innerHTML='';
+  EXAMPLES[set].forEach(([file,name])=>{
+    const src=encodeURI(`examples/${set}/${file}.png`);
+    const b=document.createElement('button'); b.type='button'; b.title=name;
+    const im=new Image(); im.src=src; im.alt=''; im.loading='lazy';
+    const sp=document.createElement('span'); sp.textContent=name;
+    b.append(im, sp);
+    b.addEventListener('click',()=>useImage(src, ()=>{
+      const cur=edName.value.trim();
+      if(!cur || cur===edAutoName){ edName.value=name.slice(0,10); edAutoName=edName.value; }
+    }));
+    exGrid.appendChild(b);
+  });
+  exGrid.scrollTop=0;
+}
+exTabs.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>renderExamples(b.dataset.set)));
+renderExamples('places');
+
 edFile.addEventListener('change',()=>{
   const f=edFile.files && edFile.files[0];
   if(!f) return;
   const fr=new FileReader();
-  fr.onload=()=>{
-    const im=new Image();
-    im.onload=()=>{
-      let w=im.naturalWidth, h=im.naturalHeight;
-      if(!w||!h){ say('이 그림은 넣을 수 없어요','ask',true); return; }
-      const r=Math.min(1, 220/Math.max(w,h));
-      w=Math.max(1,Math.round(w*r)); h=Math.max(1,Math.round(h*r));
-      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
-      cv.getContext('2d').drawImage(im,0,0,w,h);
-      edImg=cv.toDataURL('image/png');
-      renderPreview();
-    };
-    im.onerror=()=>say('그림을 읽을 수 없어요','ask',true);
-    im.src=fr.result;
-  };
+  fr.onload=()=>useImage(fr.result);
   fr.onerror=()=>say('그림을 읽을 수 없어요','ask',true);
   fr.readAsDataURL(f);
   edFile.value='';
