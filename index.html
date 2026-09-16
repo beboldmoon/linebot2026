@@ -99,6 +99,33 @@
     display:flex; align-items:center; justify-content:center;}
   #status .sic svg{width:78%; height:78%;}
   #status.flash{background:#fff3b8;}
+
+  /* 신규생성 편집 모달 */
+  #editor{position:fixed; inset:0; z-index:50; background:rgba(20,40,60,.55);
+    display:flex; align-items:center; justify-content:center;}
+  #editor[hidden]{display:none;}
+  .ebox{background:#fff; border-radius:20px; padding:24px 26px; width:min(92vw,420px);
+    box-shadow:0 18px 50px rgba(0,0,0,.32);}
+  .ebox h2{font-size:22px; color:#2c3e50; display:flex; align-items:center; gap:.45em;}
+  .ebox h2 svg{width:1.15em; height:1.15em;}
+  .ebox label{display:block; font-size:14px; font-weight:800; color:#7b8a99; margin:16px 0 6px;}
+  #edName{width:100%; font-family:inherit; font-size:19px; font-weight:800; color:#2c3e50;
+    padding:10px 12px; border:3px solid #dbe6ef; border-radius:12px;
+    -webkit-user-select:text; user-select:text;}
+  #edName:focus{outline:none; border-color:#2f6db5;}
+  .epick{display:flex; align-items:center; gap:14px;}
+  #edPreview{width:88px; height:88px; flex:none; border-radius:14px; overflow:hidden;
+    border:3px dashed #c3d3e0; background:#f6fafd;
+    display:flex; align-items:center; justify-content:center;}
+  #edPreview img{width:100%; height:100%; object-fit:contain;}
+  #edPreview span{font-size:34px; font-weight:900; color:#b6c6d4;}
+  .ebox button{font-family:inherit; font-weight:900; cursor:pointer; border:0;
+    border-radius:12px; padding:11px 16px; font-size:16px;}
+  .epick button{background:#eef4f9; color:#456; display:block; width:100%; margin-bottom:8px;}
+  .erow{display:flex; gap:10px; margin-top:22px;}
+  .erow button{flex:1; padding:13px; font-size:18px;}
+  #edCancel{background:#eef2f5; color:#556;}
+  #edSave{background:#37a94c; color:#fff;}
 </style>
 </head>
 <body>
@@ -109,6 +136,7 @@
       <button data-cat="town" class="on"><svg viewBox="-16 -16 32 32"><path d="M -12 0 L 0 -11 L 12 0" fill="none" stroke="#456" stroke-width="3.4" stroke-linecap="round"/><rect x="-8" y="-1" width="16" height="12" rx="2" fill="none" stroke="#456" stroke-width="3.4"/></svg>동네</button>
       <button data-cat="world"><svg viewBox="-16 -16 32 32"><circle cx="0" cy="0" r="12" fill="none" stroke="#456" stroke-width="3"/><ellipse cx="0" cy="0" rx="5.5" ry="12" fill="none" stroke="#456" stroke-width="2.6"/><path d="M -11.5 -4 H 11.5 M -11.5 4 H 11.5" stroke="#456" stroke-width="2.6" fill="none"/></svg>세계</button>
       <button data-cat="grid"><svg viewBox="-16 -16 32 32"><path d="M -12 -4 H 12 M -12 4 H 12 M -4 -12 V 12 M 4 -12 V 12" stroke="#456" stroke-width="3.4" stroke-linecap="round" fill="none"/></svg>연습</button>
+      <button data-cat="custom"><svg viewBox="-16 -16 32 32"><rect x="-3.2" y="-12" width="6.4" height="24" rx="3" fill="#456"/><rect x="-12" y="-3.2" width="24" height="6.4" rx="3" fill="#456"/></svg>신규생성</button>
     </div>
     <div class="tabs" id="lvlTabs">
       <button data-lvl="1" class="on"><svg viewBox="-12 -12 24 24"><polygon points="0,-10 2.9,-3.2 10,-3.2 4.4,1.6 6.6,8.6 0,4.4 -6.6,8.6 -4.4,1.6 -10,-3.2 -2.9,-3.2" fill="#f2b520"/></svg></button>
@@ -140,6 +168,27 @@
     </div>
     <div id="status"></div>
   </footer>
+</div>
+
+<div id="editor" hidden>
+  <div class="ebox">
+    <h2><svg viewBox="-16 -16 32 32"><rect x="-3.2" y="-12" width="6.4" height="24" rx="3" fill="#2f6db5"/><rect x="-12" y="-3.2" width="24" height="6.4" rx="3" fill="#2f6db5"/></svg>장소 만들기</h2>
+    <label for="edName">이름</label>
+    <input id="edName" type="text" maxlength="10" placeholder="예: 우리 학교">
+    <label>그림</label>
+    <div class="epick">
+      <div id="edPreview"></div>
+      <div style="flex:1">
+        <button id="edPick" type="button">그림 고르기</button>
+        <button id="edDrop" type="button">그림 지우기</button>
+      </div>
+    </div>
+    <input id="edFile" type="file" accept="image/*" hidden>
+    <div class="erow">
+      <button id="edCancel" type="button">취소</button>
+      <button id="edSave" type="button">저장</button>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -250,12 +299,42 @@ function gridMap(lvl){
     slotNodes, shops:[]
   };
 }
+/* 신규생성: 이름/그림을 사용자가 채우는 빈 지도 */
+const CUSTOM_PALETTE = ['#3f6fb0','#8a7355','#d6604f','#e0a52e','#4d9d5d','#5b6ee1'];
+const CUSTOM_NODES = {
+  1:[['U1',-1],['D1',1]],
+  2:[['U1',-1],['U2',-1],['D1',1],['D2',1]],
+  3:[['U1',-1],['U2',-1],['U3',-1],['D1',1],['D2',1],['D3',1]]
+};
+const CUSTOM_SHOPS = {};
+[1,2,3].forEach(l=>{
+  CUSTOM_SHOPS[l] = CUSTOM_NODES[l].map((s,i)=>[s[0], '', CUSTOM_PALETTE[i%CUSTOM_PALETTE.length], null, s[1]]);
+});
+
 const MAPS={};
 [1,2,3].forEach(l=>{
   MAPS['town'+l]  = roadMap(l,'town',  TOWN_SHOPS,  {node:'R',name:'용산가족센터',c:'#d977a4',glyph:'homeheart',dy:0});
   MAPS['world'+l] = roadMap(l,'world', WORLD_SHOPS, {node:'R',name:'한국 기와집',c:'#5a6e8c',glyph:'hanok',dy:0});
   MAPS['grid'+l]  = gridMap(l);
+  MAPS['custom'+l]= roadMap(l,'custom', CUSTOM_SHOPS, {node:'R',name:'',c:'#7a8aa0',glyph:null,dy:0});
 });
+
+/* 신규생성 데이터 (단계별 장소 이름/그림) */
+const CKEY='linebot2026.custom.v1';
+const customData={1:[],2:[],3:[]};
+try{
+  const raw=localStorage.getItem(CKEY);
+  if(raw){ const o=JSON.parse(raw); [1,2,3].forEach(l=>{ if(Array.isArray(o[l])) customData[l]=o[l]; }); }
+}catch(e){}
+function customSlot(l,i){
+  if(!customData[l]) customData[l]=[];
+  if(!customData[l][i]) customData[l][i]={name:'',img:''};
+  return customData[l][i];
+}
+function saveCustom(){
+  try{ localStorage.setItem(CKEY, JSON.stringify(customData)); return true; }
+  catch(e){ return false; }
+}
 
 /* ===== 공통 ===== */
 const HEAD = {E:{dx:1,dy:0,a:0}, S:{dx:0,dy:1,a:90}, W:{dx:-1,dy:0,a:180}, N:{dx:0,dy:-1,a:270}};
@@ -474,18 +553,47 @@ function drawMap(){
     }
   });
 
-  // 가게: 픽토그램 + 작은 이름
-  map.shops.forEach(s=>{
+  // 가게: 픽토그램 + 작은 이름 (신규생성은 사용자가 넣은 이름/그림)
+  map.shops.forEach((s,si)=>{
     const n=map.nodes[s.node];
     let bx=n.x, by=n.y + (s.dy===0?0:s.dy*100);
     if(s.dy===0){ bx=n.x+135; }
+    const mine = (cat==='custom');
+    const data = mine ? customSlot(lvl,si) : null;
+    const empty = mine && !data.name && !data.img;
+    const label = mine ? (data.name || '여기를 톡!') : s.name;
     const g=el('g',{},gDeco);
-    el('rect',{x:bx-62,y:by-36,width:124,height:72,rx:9,fill:'#fff',stroke:s.c,'stroke-width':4},g);
-    el('path',{d:`M ${bx-70} ${by-32} L ${bx} ${by-70} L ${bx+70} ${by-32} Z`,fill:s.c},g);
-    drawGlyph(g, s.glyph, bx, by-8);
-    const fs = s.name.length>=7 ? 15 : (s.name.length>=6 ? 16.5 : 18);
-    const t=el('text',{x:bx,y:by+27,'text-anchor':'middle','font-size':fs,'font-weight':800,fill:'#555'},g);
-    t.textContent=s.name;
+
+    const box={x:bx-62,y:by-36,width:124,height:72,rx:9,fill:'#fff',stroke:s.c,'stroke-width':4};
+    if(empty) box['stroke-dasharray']='9 7';
+    el('rect',box,g);
+    const roof={d:`M ${bx-70} ${by-32} L ${bx} ${by-70} L ${bx+70} ${by-32} Z`,fill:s.c};
+    if(empty) roof.opacity=.45;
+    el('path',roof,g);
+
+    if(mine){
+      if(data.img){
+        const im=el('image',{x:bx-25,y:by-31,width:50,height:42,preserveAspectRatio:'xMidYMid meet'},g);
+        im.setAttribute('href',data.img);
+        im.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href',data.img);
+      }else{
+        el('path',{d:`M ${bx} ${by-21} V ${by+3} M ${bx-12} ${by-9} H ${bx+12}`,
+          stroke:s.c,'stroke-width':5,'stroke-linecap':'round',opacity:.55},g);
+      }
+    }else{
+      drawGlyph(g, s.glyph, bx, by-8);
+    }
+
+    const fs = label.length>=7 ? 15 : (label.length>=6 ? 16.5 : 18);
+    const t=el('text',{x:bx,y:by+27,'text-anchor':'middle','font-size':fs,'font-weight':800,
+      fill: empty?'#9fb0bd':'#555'},g);
+    t.textContent=label;
+
+    if(mine){
+      g.setAttribute('cursor','pointer');
+      el('rect',{x:bx-70,y:by-70,width:140,height:112,fill:'transparent'},g);
+      g.addEventListener('click',()=>{ if(!running) openEditor(si); });
+    }
   });
 
   // 스티커 슬롯
@@ -753,6 +861,74 @@ picTabs.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
   drawMap();
 }));
 
+/* ===== 신규생성 편집기 ===== */
+const editor=document.getElementById('editor');
+const edName=document.getElementById('edName');
+const edPreview=document.getElementById('edPreview');
+const edFile=document.getElementById('edFile');
+let edIdx=-1, edImg='';
+
+function renderPreview(){
+  edPreview.innerHTML='';
+  if(edImg){ const i=new Image(); i.src=edImg; edPreview.appendChild(i); }
+  else { const sp=document.createElement('span'); sp.textContent='+'; edPreview.appendChild(sp); }
+}
+function openEditor(i){
+  if(running) return;
+  edIdx=i;
+  const d=customSlot(lvl,i);
+  edName.value=d.name||''; edImg=d.img||'';
+  renderPreview();
+  editor.hidden=false;
+  setTimeout(()=>edName.focus(),60);
+}
+function closeEditor(){ editor.hidden=true; edFile.value=''; }
+
+document.getElementById('edPick').addEventListener('click',()=>edFile.click());
+document.getElementById('edDrop').addEventListener('click',()=>{ edImg=''; renderPreview(); });
+edFile.addEventListener('change',()=>{
+  const f=edFile.files && edFile.files[0];
+  if(!f) return;
+  const fr=new FileReader();
+  fr.onload=()=>{
+    const im=new Image();
+    im.onload=()=>{
+      let w=im.naturalWidth, h=im.naturalHeight;
+      if(!w||!h){ say('이 그림은 넣을 수 없어요','ask',true); return; }
+      const r=Math.min(1, 220/Math.max(w,h));
+      w=Math.max(1,Math.round(w*r)); h=Math.max(1,Math.round(h*r));
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(im,0,0,w,h);
+      edImg=cv.toDataURL('image/png');
+      renderPreview();
+    };
+    im.onerror=()=>say('그림을 읽을 수 없어요','ask',true);
+    im.src=fr.result;
+  };
+  fr.onerror=()=>say('그림을 읽을 수 없어요','ask',true);
+  fr.readAsDataURL(f);
+  edFile.value='';
+});
+document.getElementById('edSave').addEventListener('click',()=>{
+  if(edIdx<0) return;
+  const d=customSlot(lvl,edIdx);
+  const prev={name:d.name,img:d.img};
+  d.name=edName.value.trim().slice(0,10);
+  d.img=edImg;
+  if(!saveCustom()){
+    d.name=prev.name; d.img=prev.img;
+    say('저장 공간이 부족해요','ask',true);
+    return;
+  }
+  closeEditor(); drawMap();
+});
+document.getElementById('edCancel').addEventListener('click',closeEditor);
+editor.addEventListener('click',e=>{ if(e.target===editor) closeEditor(); });
+edName.addEventListener('keydown',e=>{
+  if(e.key==='Enter') document.getElementById('edSave').click();
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !editor.hidden) closeEditor(); });
+
 /* 현재 지도 화면을 B3(500x353mm) 가로 PDF로 저장 */
 document.getElementById('btnPdf').addEventListener('click', ()=>{
   if(!window.jspdf){ say('인터넷 연결이 필요해요','ask',true); return; }
@@ -762,7 +938,7 @@ document.getElementById('btnPdf').addEventListener('click', ()=>{
   const fg=clone.querySelector('#fxG'); if(fg) fg.remove();
 
   /* 우측 상단 라벨: 카테고리 이름 + 난이도 별 */
-  const catName = {town:'용산동네', world:'세계여러나라집', grid:'연습격자'}[cat];
+  const catName = {town:'용산동네', world:'세계여러나라집', grid:'연습격자', custom:'신규생성'}[cat];
   const lab = el('g',{},clone);
   const labT = el('text',{x:1565,y:52,'text-anchor':'end','font-size':38,'font-weight':800,fill:'#556'},lab);
   labT.textContent = catName;
