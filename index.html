@@ -760,6 +760,18 @@ document.getElementById('btnPdf').addEventListener('click', ()=>{
   const clone = svg.cloneNode(true);
   const rg=clone.querySelector('#robotG'); if(rg) rg.remove();
   const fg=clone.querySelector('#fxG'); if(fg) fg.remove();
+
+  /* 우측 상단 라벨: 카테고리 이름 + 난이도 별 */
+  const catName = {town:'용산동네', world:'세계여러나라집', grid:'연습격자'}[cat];
+  const lab = el('g',{},clone);
+  const labT = el('text',{x:1565,y:52,'text-anchor':'end','font-size':38,'font-weight':800,fill:'#556'},lab);
+  labT.textContent = catName;
+  const STAR='0,-10 2.9,-3.2 10,-3.2 4.4,1.6 6.6,8.6 0,4.4 -6.6,8.6 -4.4,1.6 -10,-3.2 -2.9,-3.2';
+  for(let i=0;i<lvl;i++){
+    el('polygon',{points:STAR,fill:'#f2b520',
+      transform:`translate(${1565-17-(lvl-1-i)*38},98) scale(1.7)`},lab);
+  }
+
   clone.setAttribute('width',1600); clone.setAttribute('height',900);
   clone.setAttribute('style','font-family:"Apple SD Gothic Neo","Malgun Gothic",sans-serif;background:#fff');
   const xml = new XMLSerializer().serializeToString(clone);
@@ -775,7 +787,6 @@ document.getElementById('btnPdf').addEventListener('click', ()=>{
     const doc = new window.jspdf.jsPDF({orientation:'landscape', unit:'mm', format:[353,500]});
     const w=480, h=w*9/16;
     doc.addImage(canvas.toDataURL('image/png'),'PNG',(500-w)/2,(353-h)/2,w,h);
-    const catName={town:'용산동네', world:'세계여러나라집', grid:'연습격자'}[cat];
     doc.save(`라인봇지도_${catName}_${lvl}단계.pdf`);
     say('PDF 저장 완료!','flag',true);
   };
